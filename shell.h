@@ -1,212 +1,219 @@
-#ifndef _SHELL_H_
-#define _SHELL_H_
+#include "shell.h"
+#include "hsh.h"
+#ifndef _QUOTE_H_
+#define _QUOTE_H_
 
-#include <sys/types.h>
-#include <limits.h>
-#include <sys/stat.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <sys/wait.h>
+#include "quote.h"
+#include "ctype.h"
+#include "tokens.h"
+#include "string.h"
+#ifndef _TYPES_H_
+#define _TYPES_H_
+#ifndef _STRING_H_
+#define _STRING_H_
+#include "command.h"
+#include <stdlib.h>
+#include <stdarg.h>
+#ifndef PATH_H
+#define PATH_H
+#ifndef LIST_H
+#define LIST_H
+#ifndef _INFO_H_
+#define _INFO_H_
+#define GETLINE_BUFFER_SIZE 4096
+#define GETLINE_TABLE_SIZE 127
+#ifndef _ERROR_H_
+#define _ERROR_H_
+#define HELP_HELP "help [BUILTIN]"
+#define HELP_DESC
+#define EXIT_HELP "exit [STATUS]"
+#define EXIT_DESC
+#define EXEC_HELP "exec COMMAND [ARGS ...]"
+#define EXEC_DESC
+#define ALIAS_HELP "alias [KEY[=VALUE] ...]"
+#define ALIAS_DESC
+#ifndef _BUILTINS_H_
+#define _BUILTINS_H_
+ifndef _ALIAS_H_
+#define _ALIAS_H_
+
+#include "dict.h"
+
+#include <stdlib.h>
 #include <unistd.h>
-#include <string.h>
-#include <fcntl.h>
+#include <stdarg.h>
+#include "alias.h"
+#include "command.h"
+#include "env.h"
+#include "error.h"
+#include "getline.h"
+#include "history.h"
+#include "list.h"
+#include "string.h"
+#include "tokens.h"
+#include "types.h"
+
+
+
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#ifndef SHELL_H
+#define SHELL_H
+#define UNSETENV_HELP "unsetenv NAME"
+#define UNSETENV_DESC
+#define SETENV_HELP "setenv [NAME [VALUE]]"
+#define SETENV_DESC
+
+
+#ifndef _ENV_H_
+#define _ENV_H_
+#include <stdbool.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <signal.h>
 #include <errno.h>
+#include <fcntl.h>
 
+#include "info.h"
+#include "list.h"
+#include "string.h"
+#include "types.h"
+ifndef _CTYPE_H_
+#define _CTYPE_H_
 
-#define CMD_NORM	0
-#define CMD_OR		1
-#define CMD_AND		2
-#define CMD_CHAIN	3
+#include <stdbool.h>
+#include <stdlib.h>
 
-#define CONVERT_LOWERCASE	1
-#define CONVERT_UNSIGNED	2
+bool _isalnum(int c);
+bool _isalpha(int c);
+bool _isdigit(int c);
+bool _isident(int c);
+bool _isspace(int c);
+bool _isquote(int c);
 
-#define BUF_FLUSH -1
-#define WRITE_BUF_SIZE 1024
-#define READ_BUF_SIZE 1024
+bool _isnumber(const char *s);
+typedef enum cmdlist_sep_n;
 
-#define USE_STRTOK 0
-#define USE_GETLINE 0
-
-#define HIST_FILE	".simple_shell_history"
-#define HIST_MAX	4096
-
-extern char **environ;
-
-/**
- * struct liststr - linked list
- * @num: no. of field
- * @str: str
- * @next: points to node
- */
-
-typedef struct liststr
-{
-	int num;
-	char *str;
-	struct liststr *next;
-} list_t;
-
-/**
- *struct passinfo - has arguements for function
- *@arg: str creates
- *@argv: array strings creates from @arg
- *@path: str path
- *@argc: count for argument
- *@line_count: err count
- *@err_num: exit code error
- *@linecount_flag: count line input
- *@fname: name of file
- *@env: environ for linked list
- *@environ: environ modification
- *@history: history node
- *@alias: alias node
- *@env_changed: true if environ has changed
- *@status: return status of final exec'd command
- *@cmd_buf: pointer to location
- *@cmd_buf_type: ||, &&, ;
- *@readfd: read line input
- *@histcount: history line counter
- */
-
-typedef struct passinfo
-{
-	char *arg;
-	char **argv;
-	char *path;
+int interactive;
 	int argc;
-	unsigned int line_count;
-	int err_num;
-	int linecount_flag;
-	char *fname;
-	list_t *env;
-	list_t *history;
-	list_t *alias;
-	char **environ;
-	int env_changed;
+	char **argv;
+	char *file;
+	int fileno;
 	int status;
+	char *line;
+	size_t lineno;
+	char **tokens;
+	pid_t pid;
+	char *cwd;
+	char *exe;
+	env_t *env;
+	list_t *path;
+	alias_t *aliases;
+	history_t *history;
+	cmdlist_t *commands;
+typedef buf_table_node_t *buf_table_t[GETLINE_TABLE_SIZE];
+void perrorl(const char *msg, ...);
+void perrorl_default(const char *arg0, size_t lineno, const char *msg, ...);
+extern char **environ;
+bool read_input(info_t *info);
+char buffer[GETLINE_BUFFER_SIZE];
+quote_state_t _read_input(char **lineptr, int fd);
+typedef dict_t env_t;
 
-	char **cmd_buf;
-	int cmd_buf_type;
-	int readfd;
-	int histcount;
-} info_t;
+env_t *env_to_dict(char **env);
+env_t *_env_to_dict(env_t **tailptr, char **env);
+char **dict_to_env(env_t *head);
 
-#define INFO_INIT \
-{NULL, NULL, NULL, 0, 0, 0, 0, NULL, NULL, NULL, NULL, NULL, 0, 0, NULL, \
-	0, 0, 0}
+int parse(info_t *info);
 
-/**
- *struct builtin - has builtin str
- *@type: builtin cmd flag
- *@func: Fn
- */
+int execute(info_t *info);
+int _execute(info_t *info);
 
-typedef struct builtin
-{
-	char *type;
-	int (*func)(info_t *);
-} builtin_table;
+void expand_aliases(alias_t *aliases, char ***tokptr);
+char *expand_alias(alias_t *aliases, char ***tokptr);
 
+void expand_vars(info_t *info, char ***tokptr);
+char **_expand_vars(info_t *info, char ***tokptr);
+cmdlist_t *cmd_to_list(const char *cmd);
+cmdlist_t *_cmd_to_list(cmdlist_t **tailptr, char *split, size_t count);
 
-int _strlen(char *);
-int _strcmp(char *, char *);
-char *starts_with(const char *, const char *);
-char *_strcat(char *, char *);
+size_t split_cmd(char *cmd);
 
-char *_strcpy(char *, char *);
-char *_strdup(const char *);
-void _puts(char *);
-int _putchar(char);
+cmdlist_t *add_cmd_end(cmdlist_t **headptr, const char *cmd);
+cmdlist_t *del_cmd(cmdlist_t **headptr, size_t index);
+char **pop_cmd(cmdlist_t **headptr);
+void free_cmdlist(cmdlist_t **headptr);
 
-char *_strncpy(char *, char *, int);
-char *_strncat(char *, char *, int);
-char *_strchr(char *, char);
+cmdtree_t *cmd_to_tree(const char * const *tokens);
+void free_cmdtree(cmdtree_t **rootptr);
+const struct builtin *get_builtin(const char *name);
+const struct builtin *get_builtins(void);
 
-int hsh(info_t *, char **);
-int find_builtin(info_t *);
-void find_cmd(info_t *);
-void fork_cmd(info_t *);
+int __alias(info_t *info);
+int __cd(info_t *info);
+int __env(info_t *info);
+int __exec(info_t *info);
+int __exit(info_t *info);
+int __help(info_t *info);
+int __history(info_t *info);
+int __setenv(info_t *info);
+int __unsetenv(info_t *info);
 
-int is_cmd(info_t *, char *);
-char *dup_chars(char *, int, int);
-char *find_path(info_t *, char *, char *);
+typedef int (*builtin_fp)(info_t *);
+void remove_comments(cmdlist_t *cmd);
 
-int loophsh(char **);
+void open_script(info_t *info);
 
-int interactive(info_t *);
-int is_delim(char, char *);
-int _isalpha(int);
+void _sigint(int signal);
+char *search_path(info_t *info, list_t *path);
+char *search_path(info_t *info, list_t *path);
+int parse(info_t *info);
+list_t *str_to_list(const char *str, char delim);
+list_t *_str_to_list(list_t **tailptr, const char *str, char delim);
+list_t *add_node(list_t **headptr, const char *str);
+list_t *add_node_end(list_t **headptr, const char *str);
+void free_list(list_t **headptr);
 
-size_t list_len(const list_t *);
-char **list_to_strings(list_t *);
-size_t print_list(const list_t *);
-list_t *node_starts_with(list_t *, char *, char);
-ssize_t get_node_index(list_t *, list_t *);
+ssize_t _memchr(const void *src, unsigned char chr, size_t n);
+void *_memcpy(void *dest, const void *src, size_t n);
+void *_memdup(const void *src, size_t n);
+void *_memset(void *dest, unsigned char chr, size_t n);
 
-int is_chain(info_t *, char *, size_t *);
-void check_chain(info_t *, char *, size_t *, size_t, size_t);
-int replace_alias(info_t *);
-int replace_vars(info_t *);
-int replace_string(char **, char *);
+ssize_t _strchr(const char *str, char chr);
+ssize_t _strnchr(const char *str, char chr, size_t n);
 
-int _atoi(char *);
+int _strcmp(const char *s1, const char *s2);
+int _strncmp(const char *s1, const char *s2, size_t n);
 
-int _erratoi(char *);
-void print_error(info_t *, char *);
-int print_d(int, int);
-char *convert_number(long int, int, int);
-void remove_comments(char *);
+char *_strcpy(char *dest, const char *src);
+char *_strncpy(char *dest, const char *src, size_t n);
 
-int _myexit(info_t *);
-int _mycd(info_t *);
-int _myhelp(info_t *);
+char *_strdup(const char *str);
+char *_strndup(const char *str, size_t n);
 
-int _myhistory(info_t *);
-int _myalias(info_t *);
+ssize_t _strlen(const char *str);
+ssize_t _strnlen(const char *str, size_t n);
 
-char *_getenv(info_t *, const char *);
-int _myenv(info_t *);
-int _mysetenv(info_t *);
-int _myunsetenv(info_t *);
-int populate_env_list(info_t *);
+char *strjoin(size_t *n, const char *sep, const char *pre, const char *suf);
+char *strjoina(size_t *n, const char *sep, const char **array);
+char *strjoinl(size_t *n, const char *sep, ...);
 
-char **get_environ(info_t *);
-int _unsetenv(info_t *, char *);
-int _setenv(info_t *, char *, char *);
+unsigned int atou(char *s);
+char *num_to_str(size_t n);
 
-ssize_t get_input(info_t *);
-int _getline(info_t *, char **, size_t *);
-void sigintHandler(int);
-
-void clear_info(info_t *);
-void set_info(info_t *, char **);
-void free_info(info_t *, int);
-
-char *get_history_file(info_t *info);
-int write_history(info_t *info);
-int read_history(info_t *info);
-int build_history_list(info_t *info, char *buf, int linecount);
-int renumber_history(info_t *info);
-
-list_t *add_node(list_t **, const char *, int);
-list_t *add_node_end(list_t **, const char *, int);
-size_t print_list_str(const list_t *);
-int delete_node_at_index(list_t **, unsigned int);
-void free_list(list_t **);
-
-void _eputs(char *);
-int _eputchar(char);
-int _putfd(char c, int fd);
-int _putsfd(char *str, int fd);
-
-char **strtow(char *, char *);
-char **strtow2(char *, char);
-
-char *_memset(char *, char, unsigned int);
-void ffree(char **);
-void *_realloc(void *, unsigned int, unsigned int);
-
-int bfree(void **);
+char *strjoin(size_t *n, const char *sep, const char *pre, const char *suf);
+char **tokenize(const char *str);
+ssize_t _strnchr(const char *str, char chr, size_t n);
+char *strjoin(size_t *n, const char *sep, const char *pre, const char *suf);
+ssize_t _strchr(const char *str, char chr);
+size_t split_cmd(char *cmd);
+void remove_comments(cmdlist_t *cmd);
+typedef enum quote_state;
+quote_state_t quote_state(char c);
 
 #endif
+
